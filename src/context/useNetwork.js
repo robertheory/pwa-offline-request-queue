@@ -1,3 +1,4 @@
+import { useSnackbar } from 'notistack';
 import {
   createContext,
   useCallback,
@@ -21,6 +22,8 @@ const networkContext = createContext({
 // };
 
 const NetworkProvider = ({ children }) => {
+  const { enqueueSnackbar } = useSnackbar();
+
   const [isOnline, setIsOnline] = useState(true);
   const [queue, setQueue] = useState(() => {
     const queue = localStorage.getItem('queue');
@@ -31,9 +34,11 @@ const NetworkProvider = ({ children }) => {
     ({ body, method, headers, url }) => {
       setQueue((prev) => [...prev, { body, method, headers, url, id: v4() }]);
 
+      enqueueSnackbar('Request queued', { variant: 'info' });
+
       localStorage.setItem('queue', JSON.stringify(queue));
     },
-    [queue]
+    [enqueueSnackbar, queue]
   );
 
   const dequeueRequest = useCallback(
@@ -59,11 +64,13 @@ const NetworkProvider = ({ children }) => {
           headers,
           mode: 'no-cors',
         });
+
+        enqueueSnackbar('Request sent', { variant: 'success' });
       } catch (error) {
         console.log('error', error);
       }
     },
-    [enqueueRequest, isOnline]
+    [enqueueRequest, enqueueSnackbar, isOnline]
   );
 
   const syncQueue = useCallback(async () => {
@@ -82,8 +89,14 @@ const NetworkProvider = ({ children }) => {
   }, [dequeueRequest, isOnline, queue, sendRequest]);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      enqueueSnackbar('You are online', { variant: 'success' });
+      setIsOnline(true);
+    };
+    const handleOffline = () => {
+      enqueueSnackbar('You are offline', { variant: 'error' });
+      setIsOnline(false);
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -96,7 +109,7 @@ const NetworkProvider = ({ children }) => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [isOnline, syncQueue]);
+  }, [enqueueSnackbar, isOnline, syncQueue]);
 
   return (
     <networkContext.Provider value={{ isOnline, sendRequest }}>
